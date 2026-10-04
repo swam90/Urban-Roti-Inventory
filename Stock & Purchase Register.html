@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Stock & Purchase Register</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f4ef;--card:#fff;--tx:#1f2a2e;--mu:#6b7780;--ac:#0f6b5c;--bd:#dcd8cf}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171c1e;--card:#21282b;--tx:#e8ecec;--mu:#98a4a9;--ac:#3fb8a3;--bd:#364145}}
+:root[data-theme="dark"]{--bg:#171c1e;--card:#21282b;--tx:#e8ecec;--mu:#98a4a9;--ac:#3fb8a3;--bd:#364145}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:14px 16px 0}h1{font-size:19px;margin:0 0 10px}
+nav{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px}
+nav button{white-space:nowrap}
+main{padding:0 16px 40px;max-width:980px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 10px}
+input,select,textarea,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:7px;padding:8px}
+textarea{width:100%;min-height:80px}
+button{cursor:pointer}button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+button.d{color:#b3261e}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center}
+.row>*{flex:1 1 140px;min-width:0}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--bd);padding:6px 8px;text-align:left;white-space:nowrap}
+th{color:var(--mu);font-weight:600}td.n,th.n{text-align:right}
+td input,td select{width:100%;min-width:70px;padding:5px}
+.mu{color:var(--mu);font-size:13px}
+.tot{font-weight:700}
+@media print{nav,header,.noprint,.card:not(.pr){display:none!important}body{background:#fff;color:#000}.card{border:0}}
+</style></head><body>
+<header><h1>Stock &amp; Purchase Register</h1></header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<script>
+const UOMS=["pcs","bags","boxes","ctns","kgs","gms","pkts","ltrs","set"],CCS=["Restaurant","Catering"];
+let D={vendors:[],items:[],notes:"",entries:[]},tab="masters",ed=null,sumF={m:new Date().toISOString().slice(0,7),cc:"All"},dl=null;
+try{const s=localStorage.getItem("spr");if(s)D=Object.assign(D,JSON.parse(s))}catch(e){}
+const save=()=>{try{localStorage.setItem("spr",JSON.stringify(D))}catch(e){}};
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f2=n=>(+n||0).toFixed(2),today=()=>new Date().toISOString().slice(0,10);
+const opts=(a,sel)=>a.map(x=>`<option ${x==sel?"selected":""}>${esc(x)}</option>`).join("");
+function nav(){$("#nav").innerHTML=[["masters","1. Masters"],["entry","2. Daily Entry"],["days","Day Lists"],["summary","3. Summary"]].map(([k,l])=>`<button class="${tab==k?"on":""}" onclick="go('${k}')">${l}</button>`).join("")}
+function go(t){tab=t;if(t!="entry")ed=null;render()}
+function render(){nav();({masters:rMasters,entry:rEntry,days:rDays,summary:rSummary})[tab]()}
+
+/* ---------- Step 1: masters ---------- */
+function rMasters(){
+$("#app").innerHTML=`
+<div class="card"><h2>Vendor master</h2><div class="row noprint"><input id="vn" placeholder="Vendor name"><input id="va" placeholder="Address"><input id="vt" placeholder="Contact no." inputmode="tel"><button class="p" onclick="addV()">Add vendor</button></div>
+<div class="sc"><table><tr><th>Name</th><th>Address</th><th>Contact</th><th></th></tr>${D.vendors.map(v=>`<tr><td>${esc(v.name)}</td><td>${esc(v.addr)}</td><td>${esc(v.tel)}</td><td><button onclick="editV('${v.id}')">Edit</button> <button class="d" onclick="delV('${v.id}')">Delete</button></td></tr>`).join("")||'<tr><td colspan=4 class="mu">No vendors yet</td></tr>'}</table></div></div>
+<div class="card"><h2>Item master</h2><div class="row"><input id="id" placeholder="Item description"><select id="iu">${opts(UOMS)}</select><input id="ip" type="number" step="0.01" min="0" placeholder="Unit price"><button class="p" onclick="addI()">Add item</button></div>
+<div class="sc"><table><tr><th>Item</th><th>UOM</th><th class="n">Unit price</th><th></th></tr>${D.items.map(i=>`<tr><td>${esc(i.desc)}</td><td>${i.uom}</td><td class="n">${f2(i.price)}</td><td><button onclick="editI('${i.id}')">Edit</button> <button class="d" onclick="delI('${i.id}')">Delete</button></td></tr>`).join("")||'<tr><td colspan=4 class="mu">No items yet</td></tr>'}</table></div></div>
+<div class="card"><h2>Notes</h2><textarea id="nt" oninput="D.notes=this.value;save()">${esc(D.notes)}</textarea></div>`}
+function addV(){const name=$("#vn").value.trim();if(!name)return alert("Enter vendor name");D.vendors.push({id:uid(),name,addr:$("#va").value.trim(),tel:$("#vt").value.trim()});save();rMasters()}
+function editV(id){const v=D.vendors.find(x=>x.id==id),n=prompt("Name",v.name);if(n===null)return;v.name=n.trim()||v.name;const a=prompt("Address",v.addr);if(a!==null)v.addr=a;const t=prompt("Contact no.",v.tel);if(t!==null)v.tel=t;save();rMasters()}
+function delV(id){if(confirm("Delete vendor? Past entries keep their saved details.")){D.vendors=D.vendors.filter(x=>x.id!=id);save();rMasters()}}
+function addI(){const desc=$("#id").value.trim();if(!desc)return alert("Enter item description");D.items.push({id:uid(),desc,uom:$("#iu").value,price:+$("#ip").value||0});save();rMasters()}
+function editI(id){const i=D.items.find(x=>x.id==id),n=prompt("Description",i.desc);if(n===null)return;i.desc=n.trim()||i.desc;const u=prompt("UOM ("+UOMS.join(", ")+")",i.uom);if(u&&UOMS.includes(u))i.uom=u;const p=prompt("Unit price",i.price);if(p!==null&&!isNaN(p))i.price=+p;save();rMasters()}
+function delI(id){if(confirm("Delete item?")){D.items=D.items.filter(x=>x.id!=id);save();rMasters()}}
+
+/* ---------- Step 2: daily entry ---------- */
+let E=null;
+function newE(){return{id:uid(),date:today(),vendorId:"",vendor:"",addr:"",tel:"",lines:[{item:"",desc:"",uom:"pcs",price:0,qty:1,cc:"Restaurant"}]}}
+function rEntry(){
+if(!E||(ed&&E.id!=ed))E=ed?JSON.parse(JSON.stringify(D.entries.find(x=>x.id==ed))):newE();
+if(!ed&&!D.entries.find(x=>x.id==E.id)&&E.__edited===undefined){}
+const tot=E.lines.reduce((s,l)=>s+l.qty*l.price,0);
+$("#app").innerHTML=`<div class="card"><h2>${ed?"Edit day entry":"Daily inventory input"}</h2>
+<div class="row"><label>Date<br><input type="date" value="${E.date}" onchange="E.date=this.value"></label>
+<label>Vendor<br><select onchange="pickV(this.value)"><option value="">— Select vendor —</option>${D.vendors.map(v=>`<option value="${v.id}" ${v.id==E.vendorId?"selected":""}>${esc(v.name)}</option>`).join("")}${E.vendorId==""&&E.vendor?`<option selected>${esc(E.vendor)}</option>`:""}</select></label>
+<label>Address<br><input readonly value="${esc(E.addr)}"></label><label>Contact no.<br><input readonly value="${esc(E.tel)}"></label></div>
+<div class="sc"><table><tr><th>Item particulars</th><th>UOM</th><th>Unit price</th><th>Qty</th><th class="n">Amount</th><th>Cost center</th><th></th></tr>
+${E.lines.map((l,i)=>{const cust=l.item==="__c";return`<tr><td><select onchange="pickI(${i},this.value)"><option value="">— Select item —</option>${D.items.map(x=>`<option value="${x.id}" ${x.id==l.item?"selected":""}>${esc(x.desc)}</option>`).join("")}<option value="__c" ${cust?"selected":""}>✎ Custom item…</option></select>${cust?`<input placeholder="Item name" value="${esc(l.desc)}" oninput="E.lines[${i}].desc=this.value">`:""}</td>
+<td>${cust?`<select onchange="E.lines[${i}].uom=this.value">${opts(UOMS,l.uom)}</select>`:esc(l.uom)}</td>
+<td>${cust?`<input type="number" step="0.01" min="0" value="${l.price}" oninput="E.lines[${i}].price=+this.value;amt()">`:f2(l.price)}</td>
+<td><input type="number" step="any" min="0" value="${l.qty}" oninput="E.lines[${i}].qty=+this.value;amt()"></td>
+<td class="n" id="a${i}">${f2(l.qty*l.price)}</td>
+<td><select onchange="E.lines[${i}].cc=this.value">${opts(CCS,l.cc)}</select></td>
+<td><button class="d" onclick="E.lines.splice(${i},1);rEntry()">✕</button></td></tr>`}).join("")}
+<tr class="tot"><td colspan=4>Total</td><td class="n" id="tt">${f2(tot)}</td><td colspan=2></td></tr></table></div>
+<div class="row" style="margin-top:10px"><button onclick="E.lines.push({item:'',desc:'',uom:'pcs',price:0,qty:1,cc:E.lines.at(-1)?.cc||'Restaurant'});rEntry()">+ Add item row</button><button class="p" onclick="saveE()">${ed?"Update entry":"Save entry"}</button>${ed?`<button onclick="ed=null;E=null;rEntry()">Cancel edit</button>`:""}</div></div>`}
+function amt(){E.lines.forEach((l,i)=>{const e=$("#a"+i);if(e)e.textContent=f2(l.qty*l.price)});$("#tt").textContent=f2(E.lines.reduce((s,l)=>s+l.qty*l.price,0))}
+function pickV(id){const v=D.vendors.find(x=>x.id==id);Object.assign(E,v?{vendorId:id,vendor:v.name,addr:v.addr,tel:v.tel}:{vendorId:"",vendor:"",addr:"",tel:""});rEntry()}
+function pickI(i,id){const l=E.lines[i];l.item=id;const x=D.items.find(y=>y.id==id);if(x){l.desc=x.desc;l.uom=x.uom;l.price=x.price}else if(id!=="__c"){l.desc="";l.uom="pcs";l.price=0}else{l.desc="";l.price=0}rEntry()}
+function saveE(){const L=E.lines.filter(l=>l.item&&l.desc.trim()&&l.qty>0);
+if(!E.vendorId)return alert("Select a vendor");if(!L.length)return alert("Add at least one item with name and quantity");
+const rec={...E,lines:L.map(({desc,uom,price,qty,cc})=>({desc:desc.trim(),uom,price,qty,cc}))};
+const k=D.entries.findIndex(x=>x.id==rec.id);k>=0?D.entries[k]=rec:D.entries.push(rec);save();
+const d=rec.date;ed=null;E=null;sumF.m=d.slice(0,7);alert("Entry saved");rEntry()}
+
+/* ---------- day lists: view / edit / delete ---------- */
+function rDays(){
+const es=[...D.entries].sort((a,b)=>b.date.localeCompare(a.date));
+$("#app").innerHTML=`<div class="card"><h2>Day lists</h2><div class="sc"><table><tr><th>Date</th><th>Vendor</th><th class="n">Items</th><th class="n">Total</th><th></th></tr>${es.map(e=>`<tr><td>${e.date}</td><td>${esc(e.vendor)}</td><td class="n">${e.lines.length}</td><td class="n">${f2(e.lines.reduce((s,l)=>s+l.qty*l.price,0))}</td><td><button onclick="viewE('${e.id}')">View</button> <button onclick="ed='${e.id}';tab='entry';render()">Edit</button> <button class="d" onclick="delE('${e.id}')">Delete</button></td></tr>`).join("")||'<tr><td colspan=5 class="mu">No entries yet</td></tr>'}</table></div></div><div id="vw"></div>`}
+function viewE(id){const e=D.entries.find(x=>x.id==id);$("#vw").innerHTML=`<div class="card"><h2>${e.date} — ${esc(e.vendor)}</h2><div class="mu">${esc(e.addr)} · ${esc(e.tel)}</div><div class="sc"><table><tr><th>Item</th><th>UOM</th><th class="n">Price</th><th class="n">Qty</th><th class="n">Amount</th><th>Cost center</th></tr>${e.lines.map(l=>`<tr><td>${esc(l.desc)}</td><td>${l.uom}</td><td class="n">${f2(l.price)}</td><td class="n">${l.qty}</td><td class="n">${f2(l.qty*l.price)}</td><td>${l.cc}</td></tr>`).join("")}</table></div></div>`;$("#vw").scrollIntoView()}
+function delE(id){if(confirm("Delete this day's entry?")){D.entries=D.entries.filter(x=>x.id!=id);save();rDays()}}
+
+/* ---------- Step 3: summary ---------- */
+function rows(){const out=[];D.entries.filter(e=>e.date.slice(0,7)==sumF.m).sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>e.lines.forEach(l=>{if(sumF.cc=="All"||l.cc==sumF.cc)out.push({date:e.date,desc:l.desc,uom:l.uom,qty:l.qty,amt:l.qty*l.price,cc:l.cc})}));return out}
+function rSummary(){const R=rows(),T=R.reduce((s,r)=>s+r.amt,0);
+$("#app").innerHTML=`<div class="card pr"><h2>Stock summary — ${sumF.m}${sumF.cc!="All"?" · "+sumF.cc:""}</h2>
+<div class="row noprint"><label>Month<br><input type="month" value="${sumF.m}" onchange="sumF.m=this.value;rSummary()"></label><label>Cost center<br><select onchange="sumF.cc=this.value;rSummary()">${opts(["All",...CCS],sumF.cc)}</select></label></div>
+<div class="sc"><table><tr><th>Date</th><th>Item</th><th>UOM</th><th class="n">Qty</th><th class="n">Amt</th><th>Cost center</th></tr>${R.map(r=>`<tr><td>${r.date}</td><td>${esc(r.desc)}</td><td>${r.uom}</td><td class="n">${r.qty}</td><td class="n">${f2(r.amt)}</td><td>${r.cc}</td></tr>`).join("")||'<tr><td colspan=6 class="mu">No entries for this selection</td></tr>'}<tr class="tot"><td colspan=4>Total</td><td class="n">${f2(T)}</td><td></td></tr></table></div></div>
+<div class="card noprint"><h2>Export / share</h2><div class="row"><button onclick="window.print()">PDF (print / save as PDF)</button><button onclick="xl()">Excel</button><button onclick="wa()">WhatsApp</button><button onclick="mail()">Email</button></div><div class="mu">PDF: choose “Save as PDF” in the print dialog. WhatsApp/Email share the summary as text.</div></div>`}
+function txt(){const R=rows();return`Stock Summary ${sumF.m} (${sumF.cc})\n`+R.map(r=>`${r.date} | ${r.desc} | ${r.qty} ${r.uom} | ${f2(r.amt)} | ${r.cc}`).join("\n")+`\nTotal: ${f2(R.reduce((s,r)=>s+r.amt,0))}`}
+const wa=()=>window.open("https://wa.me/?text="+encodeURIComponent(txt()),"_blank");
+const mail=()=>window.open("mailto:?subject="+encodeURIComponent("Stock Summary "+sumF.m)+"&body="+encodeURIComponent(txt()));
+async function xl(){const R=rows();const h=`<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>Date</th><th>Item</th><th>UOM</th><th>Qty</th><th>Amt</th><th>Cost Center</th></tr>${R.map(r=>`<tr><td>${r.date}</td><td>${esc(r.desc)}</td><td>${r.uom}</td><td>${r.qty}</td><td>${f2(r.amt)}</td><td>${r.cc}</td></tr>`).join("")}</table></body></html>`;
+try{const d=await claude.use("downloads");if(!d)throw 0;await d.save({filename:`stock-summary-${sumF.m}.xls`,data:new Blob([h],{type:"application/vnd.ms-excel"})})}catch(e){if(e&&e.code=="cancelled")return;alert("Download isn't available here. Open the page in claude.ai to export Excel.")}}
+render();
+</script></body></html>
